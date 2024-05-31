@@ -5,14 +5,18 @@ Created on Mon May 13 14:26:39 2024
 @author: Denny Krempin
 """
 
-
 import os
 import glob
-from psychopy import gui, core, visual, event
+from psychopy import gui, core, visual, event, iohub
 import time
 import random
 import csv
 import numpy as np
+from psychopy.iohub.client import launchHubServer
+from psychopy.iohub.constants import EyeTrackerConstants
+from psychopy.tools import monitorunittools
+from psychopy.iohub.util import hideWindow, showWindow
+
 
 #bildschirm parameter
 scn_width, scn_height = (1000 , 1000)
@@ -26,12 +30,12 @@ img_list = glob.glob(img_dir + '*.png')
 
 # constants 
 max_trials = len(img_list)
-max_blocks = 6
+max_blocks = 2
 trial_dur = 6000
 continue_key = 'space'
 trial_keys = ['a', 'l']
 
-# parameter
+# parameter:
 gaze_path_list = [[["face"],[(0.2, 0.3), 1600], [(0.1, -0.4), 1200], [(0.2, 0.1), 1100]],
                   [["house"],[(0.2, -0.5), 800], [(-0.2, 0.4), 1350], [(0.1, -0.3), 1200]],
                   [["face"],[(-0.2, -0.4), 1200], [(0.4, -0.2), 900], [(-0.4, 0.3), 1900], [(0.2, 0.3), 1750]],
@@ -43,15 +47,14 @@ gaze_path_list = [[["face"],[(0.2, 0.3), 1600], [(0.1, -0.4), 1200], [(0.2, 0.1)
 instructions = {'instructions_1' : 'Welcome to our experiment' \
     'continuekey = Spacebar ...'}
 
-
-
-
 # liste an Noise Samples generieren (Range = Anzahl an samples)
 noise_list = []
 
 for i in range(25):
     noise = visual.NoiseStim(win=win, 
                        name = 'noise', 
+                       units = 'pix',
+                       size = (1000, 1000),
                        noiseType='Filtered',
                        noiseFractalPower='-1',
                        texRes=1024, interpolate=True,
@@ -60,6 +63,43 @@ for i in range(25):
                        contrast = 1) 
     
     noise_list.append(noise)
+
+#######################################################
+##########      EYETRACKER SETUP         ##############
+#######################################################
+iohub_tracker_class_path = 'eyetracker.hw.sr_research.eyelink.EyeTracker'
+eyetracker_config = dict()
+eyetracker_config['name'] = 'tracker'
+eyetracker_config['model_name'] = 'EYELINK 1000 DESKTOP'
+eyetracker_config['runtime_settings'] = dict(sampling_rate = 1000, track_eyes = 'RIGHT')
+eyetracker_config['simulation_mode'] = False
+eyetracker_config['calibration'] = dict(unit_type= 'pix',
+                                        color_type= 'rgb255',
+                                        target_attributes= dict(outer_diameter=42,
+                                                                inner_diameter=11,
+                                                                target_duration=1,
+                                                                target_delay=2),
+                                        screen_background_color = [128,128,128,255])
+
+io = launchHubServer(**{iohub_tracker_class_path: eyetracker_config})
+tracker = io.devices.tracker
+
+# run eyetracker calibration
+tracker.sendCommand('calibration_area_proportion = 0.65 0.65')
+tracker.sendCommand('validation_area_proportion = 0.65 0.65')
+result = tracker.runSetupProcedure()
+print("Calibration returned: ", result)
+
+# reinitialise the HubServer to get rid of the display trouble
+io.quit()
+io          = launchHubServer(**{iohub_tracker_class_path: eyetracker_config})
+tracker     = io.devices.tracker
+
+
+#######################################################
+##########           Functions           ##############
+#######################################################
+
 
 def present_text(window_instance,
                  text = 'Standardsatz',
@@ -173,7 +213,7 @@ def present_gaze(window_instance,
                
            dotfixation_stim.draw()
            window_instance.flip() 
-           core.wait(0.012)
+           core.wait(0.024)
     #event.waitKeys(keyList=[continue_key])
     
    return noise_sync
@@ -196,7 +236,6 @@ def present_jitter(window_instance,
    timer.reset()
    rand_jitter= random.uniform(1.0, 2.0) 
    while timer.getTime() < rand_jitter:
-        # + 9 oder  + 19 fuer entweder 10 oder 20 samples
         for i in range(noise_sync , noise_sync + 19): 
             noise_list[(i%(len(noise_list)))].draw()
         noise_sync +=1
@@ -228,10 +267,8 @@ def present_img(window_instance,
                                     )
    
    timer = core.Clock()
-   timer.reset()
    done = False
-   
-   #while timer.getTime() < 6:
+   timer.reset()
    while done == False:    
        actual = timer.getTime()
        
@@ -270,7 +307,10 @@ def present_img(window_instance,
        return ['False', RT]
        
 
-     
+#######################################################
+##########        Start Experiment       ##############
+#######################################################
+    
 def start_experiment(win,
                      image_list,
                      trial_num):
@@ -308,8 +348,7 @@ def start_experiment(win,
                                         noise_sync,
                                         shuffled_gaze_path_list[trial][-1][0])
             
-            typeOfPic = shuffled_gaze_path_list[trial][0]
-            print(typeOfPic)
+            typeofpath = shuffled_gaze_path_list[trial][0]
             present_ITI(window_instance=win,
                         duration=2) 
 
@@ -324,10 +363,57 @@ present_text(window_instance = win,
 win.close()
 
 
+#natalias Code
+"""
 
 
+TRACKER = 'eyelink' #'mouse'
+BACKGROUND_COLOR = [105, 105, 105]
 
+devices_config = dict()
+eyetracker_config = dict(name='tracker')
+if TRACKER == 'mouse':
+    eyetracker_config['calibration'] = dict(screen_background_color=BACKGROUND_COLOR)
+    devices_config['eyetracker.hw.mouse.EyeTracker'] = eyetracker_config
+elif TRACKER == 'eyelink':
+    eyetracker_config['model_name'] = 'EYELINK 1000 DESKTOP'
+    eyetracker_config['runtime_settings'] = dict(sampling_rate=1000, track_eyes='RIGHT')
+    eyetracker_config['calibration'] = dict(unit_type= 'pix',
+                                            color_type= 'rgb255',
+                                            target_attributes= dict(outer_diameter=42,
+                                                                    inner_diameter=11,
+                                                                    target_duration=1,
+                                                                    target_delay=2),
+                                            screen_background_color = BACKGROUND_COLOR)
 
+    devices_config['eyetracker.hw.sr_research.eyelink.EyeTracker'] = eyetracker_config
+
+### Soundproof lab
+SUBJ_DISTANCE = 60
+MONITOR_NAME = 'fhl_spl'
+SCREEN_WIDTH, SCREEN_HEIGHT = 1920, 1080
+WIDTH_CM, HEIGHT_CM = 53.136, 29.889
+WIDTH_DEG, HEIGHT_DEG = monitorunittools.cm2deg(WIDTH_CM, monitors.Monitor('fhl_spl')), monitorunittools.cm2deg(HEIGHT_CM, monitors.Monitor('fhl_spl'))
+
+mon = monitors.Monitor(MONITOR_NAME)
+mon.setSizePix((SCREEN_WIDTH, SCREEN_HEIGHT))
+mon.setWidth(WIDTH_CM)
+mon.setDistance(SUBJ_DISTANCE)
+mon.save()
+win = visual.Window(monitor=mon, fullscr=True, units='pix', color=BACKGROUND_COLOR)
+win.setMouseVisible(False)
+
+io = launchHubServer(window=win, **devices_config)
+tracker = io.getDevice('tracker')
+tracker.sendCommand('calibration_area_proportion = 0.65 0.65')
+tracker.sendCommand('validation_area_proportion = 0.65 0.65')
+result = tracker.runSetupProcedure()
+print("Calibration returned: ", result)
+
+win.close()
+tracker.setConnectionState(False)
+core.quit()
+ """
 
 
 
