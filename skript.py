@@ -96,6 +96,33 @@ io          = launchHubServer(**{iohub_tracker_class_path: eyetracker_config})
 tracker     = io.devices.tracker
 
 
+# # So request to start trial has occurred...
+#             # Clear the screen, start recording eye data, and clear all events
+#             # received to far.
+
+
+# self.hub.sendMessageEvent(text="TRIAL_START")
+# self.hub.clearEvents('all')
+# tracker.setRecordingState(True)  
+
+# flip_time=window.flip()
+#            self.hub.sendMessageEvent(text="TRIAL_END %d"%t,sec_time=flip_time)
+#            tracker.setRecordingState(False)
+#            self.hub.clearEvents('all')
+
+
+# self.eyetracker.sendMessage("SESSION " + sess + " BLOCKID " + str(block_ind) + " TRIALID " + str(tr_ind))
+
+
+#eyetracker.setRecordingState(True)
+#self.eyetracker.sendMessage("Recording")
+
+
+#io.clearEvents()
+#disconnect_eyetracker()
+# duration = self.master_clock.getTime() - onset
+# self.eyetracker.sendMessage("SESSION " + sess + " BLOCKID " + str(block_ind) + " TRIALEND " + str(tr_ind))
+
 #######################################################
 ##########           Functions           ##############
 #######################################################
@@ -330,7 +357,7 @@ def start_experiment(win,
       shuffled_gaze_path_list = random.sample(gaze_path_list, len(gaze_path_list))
      
       for trial in range(max_trials):
-           
+            
             draw_fixation(window_instance=win,
                          fixation_position=(0, 0))
             
