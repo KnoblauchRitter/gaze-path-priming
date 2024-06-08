@@ -25,7 +25,7 @@ RGB_GREY = [128, 128, 128]
 max_trials = len(img_list)
 max_blocks = 2
 trial_dur = 6000
-continue_key = 'space'
+continue_key = ['a', 'l']
 trial_keys = ['a', 'l']
 
 # Generate Window
@@ -48,8 +48,28 @@ gaze_path_list = [[["face"],[(0.2, 0.3), 1600], [(0.1, -0.4), 1200], [(0.2, 0.1)
                   [["house"],[(0.4, 0.1), 1800], [(-0.1, -0.2), 1150], [(0.4, 0.3), 1700]],
                   [["face"],[(-0.1, 0.3), 1550], [(0.1, -0.3), 1350], [(0.1, 0.4), 2000], [(0.1, -0.2), 1100]]]
 
-instructions = {'instructions_1' : 'Welcome to our experiment' \
-    'continuekey = Spacebar ...'}
+instructions = '''Welcome to our study: 
+During the Trials of this experiment you will be presented
+a mixture of moving dots and different images.
+
+Try to fixate your eyes on these dots and follow their movement.
+After that the image of a Face or Leaf will slowly emergy 
+somewhere around the Dot and you will have to determine 
+as quickly as possiblewhat kind of image you see by pressing a button
+
+Left Button for Face 
+Right Button for Leaf
+
+At all times keep focusing on the dot, even during the emergence of the picture
+
+There will be X Blocks with Y Trials: 
+Between these Blocks you can take a small break and relax your eyes
+
+Across the whole time there will be a noise mask obsctructing your view.
+
+---Press any Key to start the Experiment---
+'''
+
 
 # liste an Noise Samples generieren (Range = Anzahl an samples)
 noise_list = []
@@ -266,17 +286,17 @@ def present_img(window_instance,
            done = True
            RT = 6
     
-   # Answer Logic     
-   if (((face_pos[0] > 0) and ('l' in keypress)) or ((face_pos[0] < 0) and ('a' in keypress))):
+   # Answer Logic
+   if keypress == ['a'] and 'face' in img_input or keypress == ['l'] and 'L' in img_input:
        draw_circle(win)
        return ['Correct', RT]
-   else:
+   else: 
        if RT == 6:
            present_text(win, 'Sie haben keine Taste Gedrückt', waitforpress = False)
            return ['No Answer', RT]
        draw_red_cross(win)    
        return ['False', RT]
-       
+      
 
 #######################################################
 ##########        Start Experiment       ##############
@@ -293,9 +313,14 @@ def start_experiment(win,
 
   for block in range(max_blocks):
     
-
-      present_text(window_instance = win,
-                   text = f'Block {block+1}: machen sie eine Pause, zum Fortfahren Leertaste drücken',
+      if block == 0:
+          present_text(window_instance = win,
+                   text = 'Starting with Block 1',
+                   waitforpress = False,
+                   continue_key = continue_key)
+      else:
+          present_text(window_instance = win,
+                   text = f'Block {block+1}: Take a small break \n To continue press any key',
                    waitforpress = True,
                    continue_key = continue_key)
       
