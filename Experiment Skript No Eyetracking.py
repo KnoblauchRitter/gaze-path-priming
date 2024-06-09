@@ -13,11 +13,13 @@ import random
 import csv
 import numpy as np
 from psychopy.tools import monitorunittools
-
+import pandas
+import json
 
 # paths to visual stimuli
 img_dir = os.getcwd() + '//stimuli_material//exp_stim//'
 img_list = glob.glob(img_dir + '*.png')
+instruction_img = os.getcwd() + '//instructions_image'
 
 # constants 
 BACKGROUND_COLOR = [128, 128, 128]
@@ -25,13 +27,31 @@ RGB_GREY = [128, 128, 128]
 max_trials = len(img_list)
 max_blocks = 2
 trial_dur = 6000
-continue_key = ['a', 'l']
+continue_key = ['l']
 trial_keys = ['a', 'l']
+
+# supervisor input
+supervisor_input = gui.Dlg(title='Participant Data',
+                           pos=(0, 0))
+supervisor_input.addField('Probanden-ID:')
+supervisor_input.addField('Alter:')
+supervisor_input.addField('Dominant eye', choices=['Right', 'Left'])
+supervisor_input.addField('Glasses:', choices=['Yes', 'No'])
+supervisor_input.addField('Sex:', choices=['Male', 'Female'])
+supervisor_input.addField('Handednes:', choices=['Right', 'Left'])
+supervisor_input.show()
+
+sub_id = supervisor_input.data[0]
+age = supervisor_input.data[1]
+dominant_eye = supervisor_input.data[2]
+glasses = supervisor_input.data[3]
+sex = supervisor_input.data[4]
+dominant_hand = supervisor_input.data[5]
 
 # Generate Window
 win = visual.Window((1000, 1080),
                     units='pix',
-                    fullscr=False,
+                    fullscr=True,
                     allowGUI=False,
                     colorSpace='rgb255',
                     color=BACKGROUND_COLOR
@@ -39,37 +59,10 @@ win = visual.Window((1000, 1080),
 
 win.setMouseVisible(False)
 
-# parameter:
-gaze_path_list = [[["face"],[(0.2, 0.3), 1600], [(0.1, -0.4), 1200], [(0.2, 0.1), 1100]],
-                  [["house"],[(0.2, -0.5), 800], [(-0.2, 0.4), 1350], [(0.1, -0.3), 1200]],
-                  [["face"],[(-0.2, -0.4), 1200], [(0.4, -0.2), 900], [(-0.4, 0.3), 1900], [(0.2, 0.3), 1750]],
-                  [["face"],[(0.3, -0.5), 800], [(-0.2, 0.1), 1000], [(-0.3, -0.1), 1400]],
-                  [["house"],[(-0.2, 0.2), 1400], [(-0.3, 0.3), 1500], [(-0.2, -0.1), 900], [(-0.3, -0.1), 900]],
-                  [["house"],[(0.4, 0.1), 1800], [(-0.1, -0.2), 1150], [(0.4, 0.3), 1700]],
-                  [["face"],[(-0.1, 0.3), 1550], [(0.1, -0.3), 1350], [(0.1, 0.4), 2000], [(0.1, -0.2), 1100]]]
 
-instructions = '''Welcome to our study: 
-During the Trials of this experiment you will be presented
-a mixture of moving dots and different images.
-
-Try to fixate your eyes on these dots and follow their movement.
-After that the image of a Face or Leaf will slowly emergy 
-somewhere around the Dot and you will have to determine 
-as quickly as possiblewhat kind of image you see by pressing a button
-
-Left Button for Face 
-Right Button for Leaf
-
-At all times keep focusing on the dot, even during the emergence of the picture
-
-There will be X Blocks with Y Trials: 
-Between these Blocks you can take a small break and relax your eyes
-
-Across the whole time there will be a noise mask obsctructing your view.
-
----Press any Key to start the Experiment---
-'''
-
+# Load in Gaze Path Data as List
+with open('gazepathdata.json', 'rb') as fp:
+        gaze_path_list = json.load(fp)
 
 # liste an Noise Samples generieren (Range = Anzahl an samples)
 noise_list = []
@@ -100,7 +93,7 @@ def present_text(window_instance,
                  waitforpress = True,
                  text_position = (0., 0.),
                  unit='norm',
-                 continue_key='space'):
+                 continue_key= 'l'):
     
     text_stim = visual.TextStim(window_instance, 
                                 height=text_size, 
@@ -112,7 +105,26 @@ def present_text(window_instance,
     window_instance.flip()
     
     if waitforpress == True:
-        event.waitKeys(keyList=[continue_key])
+        event.waitKeys(keyList=['l'])
+    else:
+        core.wait(2)
+
+    return None
+
+def present_image(window_instance,
+                img_input,
+                waitforpress = True,
+                image_position=(0., 0.),
+                continue_key= 'l'):
+    
+    image_stim = visual.ImageStim(window_instance,
+                                  image=img_input,
+                                  pos=image_position)
+    image_stim.draw()
+    window_instance.flip()
+    
+    if waitforpress == True:
+        event.waitKeys(keyList=['l'])
     else:
         core.wait(2)
 
@@ -175,6 +187,31 @@ def present_ITI(window_instance,
     core.wait(duration)
     
     return None
+
+def present_noise(window_instance,
+                  noise_sync = 0):
+    
+   timer= core.Clock()
+   
+   
+   dotfixation_stim = visual.Circle(window_instance,
+                                    radius = 10,
+                                    lineColor = 'green',
+                                    fillColor = 'red',
+                                    pos = (1, 1)
+                                    )
+   
+   timer.reset()
+   while timer.getTime() < 1:
+        for i in range(noise_sync , noise_sync + 19): 
+            noise_list[(i%(len(noise_list)))].draw()
+        noise_sync +=1
+           
+        dotfixation_stim.draw()
+        window_instance.flip() 
+        core.wait(0.012)
+    
+   return noise_sync
 
 def present_gaze(window_instance,
                 gaze_path_input,
@@ -254,8 +291,7 @@ def present_img(window_instance,
                                     radius = 10,
                                     lineColor = 'green',
                                     fillColor = 'red',
-                                    pos = fix_position
-                                    )
+                                    pos = fix_position)
    
    timer = core.Clock()
    done = False
@@ -282,34 +318,100 @@ def present_img(window_instance,
        if ('a' in keypress) or ('l' in keypress):
            done = True
            RT = actual
+           opacity=0.08*actual
+           
        if actual > 6: 
            done = True
            RT = 6
-    
+           opacity=0.08*actual
+   
    # Answer Logic
    if keypress == ['a'] and 'face' in img_input or keypress == ['l'] and 'L' in img_input:
        draw_circle(win)
-       return ['Correct', RT]
+       return ['Correct', RT, opacity]
    else: 
        if RT == 6:
            present_text(win, 'Sie haben keine Taste Gedrückt', waitforpress = False)
-           return ['No Answer', RT]
+           return ['No Answer', RT, opacity]
        draw_red_cross(win)    
-       return ['False', RT]
-      
+       return ['False', RT, opacity]
+   
+    
+
+   
+def gen_file(sub_id):
+    
+    output_path = os.getcwd() + f'/output/sub-{sub_id}'
+    
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    
+    behav_data = pandas.DataFrame({'sub_id' : [], 
+                              'age' : [],
+                              'sex' : [],
+                              'dominant_hand': [],
+                              'dominant_eye': [],
+                              'glasses' : [],
+                              'block' : [],
+                              'trial' : [],
+                              'onset' : [],
+                              'duration' : [],
+                              'gaze_path_type' : [],
+                              'congruency' : [],
+                              'reaction_time' : [],
+                              'opacity':[],
+                              'accuracy' : [],})
+    
+    file_path = output_path + f'/output/sub-{sub_id}.tsv'
+    return behav_data, file_path
+
+def collect_responses(sub_id,
+                      age,
+                      sex,
+                      dominant_hand,
+                      dominant_eye,
+                      glasses,
+                      block,
+                      trial,
+                      onset,
+                      duration,
+                      typeofpath,
+                      congruency,
+                      reaction_time,
+                      opacity,
+                      accuracy):
+    
+    trial_column = pandas.DataFrame({'sub_id' : [sub_id], 
+                                 'age' : [age],
+                                 'sex' : [sex],
+                                 'glasses' : [glasses],
+                                 'dominant_hand' : [dominant_hand],
+                                 'dominant_eye' : [dominant_eye],
+                                 'block' : [block],
+                                 'trial' : [trial],
+                                 'onset' : [onset],
+                                 'duration' : [duration],
+                                 'gaze_path_type' : [typeofpath],
+                                 'congruency' : [congruency],
+                                 'reaction_time' : [reaction_time],
+                                 'opacity' : [opacity],
+                                 'accuracy' : [accuracy]})
+    return trial_column
 
 #######################################################
 ##########        Start Experiment       ##############
 #######################################################
+
+
     
 def start_experiment(win,
                      image_list,
                      trial_num):
-    
-  present_text(window_instance=win,
-                   text=instructions,
-                   waitforpress=True,                   
-                   continue_key=continue_key)
+   
+  sub_data, file_path = gen_file(sub_id) 
+  global_timer = core.Clock()
+  
+  present_image(win,instruction_img)
 
   for block in range(max_blocks):
     
@@ -317,22 +419,23 @@ def start_experiment(win,
           present_text(window_instance = win,
                    text = 'Starting with Block 1',
                    waitforpress = False,
-                   continue_key = continue_key)
+                   continue_key = ['l'])
       else:
           present_text(window_instance = win,
                    text = f'Block {block+1}: Take a small break \n To continue press any key',
                    waitforpress = True,
-                   continue_key = continue_key)
+                   continue_key = ['l'])
       
       shuffled_img_list = random.sample(img_list, len(img_list))
       shuffled_gaze_path_list = random.sample(gaze_path_list, len(gaze_path_list))
      
       for trial in range(max_trials):
-        
-
             
+            onset = global_timer.getTime()
             draw_fixation(window_instance=win,
                          fixation_position=(0, 0))
+            
+            noise_sync = present_noise(win)
             
             noise_sync = present_gaze(window_instance = win, 
                                       gaze_path_input = shuffled_gaze_path_list[trial])
@@ -343,13 +446,44 @@ def start_experiment(win,
                                         noise_sync = noise_sync)
 
 
-            [answer, RT] = present_img( win, 
+            [answer, RT, opacity] = present_img( win, 
                                         shuffled_img_list[trial],
                                         noise_sync,
                                         shuffled_gaze_path_list[trial][-1][0])
-
-            #typeofpath = shuffled_gaze_path_list[trial][0]
-
+            
+            
+            trial_duration = onset - global_timer.getTime()
+            
+            if 'F'== gaze_path_list[trial][0] and 'face' in shuffled_img_list[trial] or 'L'== gaze_path_list[trial][0] and 'L' in shuffled_img_list[trial]:
+                congruency = 1
+            else:
+                congruency = 0
+            
+            typeofpath = shuffled_gaze_path_list[trial][0]
+            
+            sub_data = sub_data.append(collect_responses(sub_id=sub_id,
+                                                         age=age,
+                                                         sex=sex,
+                                                         dominant_hand= dominant_hand,
+                                                         dominant_eye= dominant_eye,
+                                                         glasses=glasses,
+                                                         block=block+1,
+                                                         trial=trial+1,
+                                                         onset= onset,
+                                                         duration = trial_duration,
+                                                         typeofpath = typeofpath,
+                                                         congruency = congruency,
+                                                         reaction_time=RT,
+                                                         opacity = opacity,
+                                                         accuracy= answer))           
+            
+            try:
+                sub_data.to_csv(file_path, 
+                                index=False,
+                                sep='\t')
+            except:
+                print(f'Error saving file: {file_path}')
+            
             present_ITI(window_instance=win,
                         duration=2) 
 
@@ -357,7 +491,7 @@ def start_experiment(win,
 start_experiment(win, img_list, max_trials)
 
 present_text(window_instance = win,
-             instr_text = 'Vielen dank für die Teilnahme etc.',
+             text = 'Vielen dank für die Teilnahme etc.',
              waitforpress = False,
              continue_key = continue_key)
 
