@@ -19,7 +19,8 @@ import json
 # paths to visual stimuli
 img_dir = os.getcwd() + '//stimuli_material//exp_stim//'
 img_list = glob.glob(img_dir + '*.png')
-instruction_img = os.getcwd() + '//instructions_image'
+instruction_img_ALLF = os.getcwd() + '//instructions_image_ALLF'
+instruction_img_AFLL = os.getcwd() + '//instructions_image_AFLL'
 
 # constants 
 BACKGROUND_COLOR = [128, 128, 128]
@@ -39,6 +40,7 @@ supervisor_input.addField('Dominant eye', choices=['Right', 'Left'])
 supervisor_input.addField('Glasses:', choices=['Yes', 'No'])
 supervisor_input.addField('Sex:', choices=['Male', 'Female'])
 supervisor_input.addField('Handednes:', choices=['Right', 'Left'])
+supervisor_input.addField('Response Buttons:', choices=['AF_LL', 'AL_LF'])
 supervisor_input.show()
 
 sub_id = supervisor_input.data[0]
@@ -47,6 +49,7 @@ dominant_eye = supervisor_input.data[2]
 glasses = supervisor_input.data[3]
 sex = supervisor_input.data[4]
 dominant_hand = supervisor_input.data[5]
+response_buttons = supervisor_input.data[6]
 
 # Generate Window
 win = visual.Window((1000, 1080),
@@ -325,17 +328,29 @@ def present_img(window_instance,
            RT = 6
            opacity=0.08*actual
    
-   # Answer Logic
-   if keypress == ['a'] and 'face' in img_input or keypress == ['l'] and 'L' in img_input:
-       draw_circle(win)
-       return ['Correct', RT, opacity]
-   else: 
-       if RT == 6:
-           present_text(win, 'Sie haben keine Taste Gedrückt', waitforpress = False)
-           return ['No Answer', RT, opacity]
-       draw_red_cross(win)    
-       return ['False', RT, opacity]
+   # Answer Logic based on set Response Buttons
    
+   if response_buttons == 'AF_LL':
+       if keypress == ['a'] and 'face' in img_input or keypress == ['l'] and 'L' in img_input:
+           draw_circle(win)
+           return ['Correct', RT, opacity]
+       else: 
+           if RT == 6:
+               present_text(win, 'Sie haben keine Taste Gedrückt', waitforpress = False)
+               return ['No Answer', RT, opacity]
+           draw_red_cross(win)    
+           return ['False', RT, opacity]
+       
+   elif response_buttons == 'AL_LF':
+       if keypress == ['a'] and 'L' in img_input or keypress == ['l'] and 'face' in img_input:
+           draw_circle(win)
+           return ['Correct', RT, opacity]
+       else: 
+           if RT == 6:
+               present_text(win, 'Sie haben keine Taste Gedrückt', waitforpress = False)
+               return ['No Answer', RT, opacity]
+           draw_red_cross(win)    
+           return ['False', RT, opacity]
     
 
    
@@ -360,7 +375,8 @@ def gen_file(sub_id):
                               'congruency' : [],
                               'reaction_time' : [],
                               'opacity':[],
-                              'accuracy' : [],})
+                              'accuracy' : [],
+                              'responsebuttons': []})
     
     file_path = output_path + f'/output/sub-{sub_id}.tsv'
     return behav_data, file_path
@@ -379,7 +395,8 @@ def collect_responses(sub_id,
                       congruency,
                       reaction_time,
                       opacity,
-                      accuracy):
+                      accuracy,
+                      responsebuttons):
     
     trial_column = pandas.DataFrame({'sub_id' : [sub_id], 
                                  'age' : [age],
@@ -395,7 +412,8 @@ def collect_responses(sub_id,
                                  'congruency' : [congruency],
                                  'reaction_time' : [reaction_time],
                                  'opacity' : [opacity],
-                                 'accuracy' : [accuracy]})
+                                 'accuracy' : [accuracy],
+                                 'responsebuttons' : [responsebuttons]})
     return trial_column
 
 #######################################################
@@ -411,7 +429,10 @@ def start_experiment(win,
   sub_data, file_path = gen_file(sub_id) 
   global_timer = core.Clock()
   
-  present_image(win,instruction_img)
+  if response_buttons == 'ALLF':
+    present_image(win,instruction_img_ALLF)
+  else:
+    present_image(win,instruction_img_AFLL)
 
   for block in range(max_blocks):
     
@@ -475,7 +496,8 @@ def start_experiment(win,
                                                          congruency = congruency,
                                                          reaction_time=RT,
                                                          opacity = opacity,
-                                                         accuracy= answer))           
+                                                         accuracy= answer,
+                                                         responsebuttons = response_buttons))           
             
             try:
                 sub_data.to_csv(file_path, 
