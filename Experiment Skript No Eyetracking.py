@@ -54,7 +54,7 @@ response_buttons = supervisor_input.data[6]
 # Generate Window
 win = visual.Window((1000, 1080),
                     units='pix',
-                    fullscr=True,
+                    fullscr=False,
                     allowGUI=False,
                     colorSpace='rgb255',
                     color=BACKGROUND_COLOR
@@ -286,10 +286,13 @@ def present_img(window_instance,
    
    pos_list_x = [-150,0,150]
    pos_list_y = [-150,0,150]
-   face_pos = (0,0)
-   while face_pos == (0,0):
+   fix_position = (fix_position[0],fix_position[1])
+        
+   face_pos = fix_position
+   while face_pos == fix_position:
        face_pos = (fix_position[0]+random.choice(pos_list_x),fix_position[1]+random.choice(pos_list_y))
-   
+
+
    dotfixation_stim = visual.Circle(window_instance,
                                     radius = 10,
                                     lineColor = 'green',
@@ -378,7 +381,7 @@ def gen_file(sub_id):
                               'accuracy' : [],
                               'responsebuttons': []})
     
-    file_path = output_path + f'/output/sub-{sub_id}.tsv'
+    file_path = output_path + f'/sub-{sub_id}.tsv'
     return behav_data, file_path
 
 def collect_responses(sub_id,
@@ -449,38 +452,38 @@ def start_experiment(win,
       
       shuffled_img_list = random.sample(img_list, len(img_list))
       shuffled_gaze_path_list = random.sample(gaze_path_list, len(gaze_path_list))
-     
+
       for trial in range(max_trials):
-            
             onset = global_timer.getTime()
             draw_fixation(window_instance=win,
                          fixation_position=(0, 0))
             
             noise_sync = present_noise(win)
             
+            gaze_path_temp = shuffled_gaze_path_list[trial][0:random.randint(3,5)]
             noise_sync = present_gaze(window_instance = win, 
-                                      gaze_path_input = shuffled_gaze_path_list[trial])
+                                      gaze_path_input = gaze_path_temp)
             
-            #  shuffled_gaze_path_list[trial][-1][0] = last Fixation Position
+            #  gaze_path_temp[-1][0] = last Fixation Position
             noise_sync = present_jitter(window_instance = win, 
-                                        fix_position = shuffled_gaze_path_list[trial][-1][0],
+                                        fix_position = gaze_path_temp[-1][0],
                                         noise_sync = noise_sync)
 
 
             [answer, RT, opacity] = present_img( win, 
                                         shuffled_img_list[trial],
                                         noise_sync,
-                                        shuffled_gaze_path_list[trial][-1][0])
+                                        gaze_path_temp[-1][0])
             
             
             trial_duration = onset - global_timer.getTime()
             
-            if 'F'== gaze_path_list[trial][0] and 'face' in shuffled_img_list[trial] or 'L'== gaze_path_list[trial][0] and 'L' in shuffled_img_list[trial]:
+            if 'F'== gaze_path_temp[0] and 'face' in shuffled_img_list[trial] or 'L'== gaze_path_temp[0] and 'L' in shuffled_img_list[trial]:
                 congruency = 1
             else:
                 congruency = 0
             
-            typeofpath = shuffled_gaze_path_list[trial][0]
+            typeofpath = gaze_path_temp[0]
             
             sub_data = sub_data.append(collect_responses(sub_id=sub_id,
                                                          age=age,

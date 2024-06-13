@@ -1,0 +1,3 @@
+sub_id	age	sex	dominant_hand	dominant_eye	glasses	block	trial	onset	duration	gaze_path_type	congruency	reaction_time	opacity	accuracy	responsebuttons
+07	24	Male	Right	Right	Yes	1.0	1.0	3.9073956000002	-12.060887699999967	['L']	0.0	5.013492600000063	0.4010794080000051	Correct	AF_LL
+07	24	Male	Right	Right	Yes	1.0	2.0	17.982132600000114	-13.152608599999894	['L']	0.0	6.0	0.48162031200001365	No Answer	AF_LL
