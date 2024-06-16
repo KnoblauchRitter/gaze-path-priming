@@ -379,7 +379,9 @@ def gen_file(sub_id):
                               'reaction_time' : [],
                               'opacity':[],
                               'accuracy' : [],
-                              'responsebuttons': []})
+                              'responsebuttons': [],
+                              'fixamount' : [],
+                              'presentedfixations' : []})
     
     file_path = output_path + f'/sub-{sub_id}.tsv'
     return behav_data, file_path
@@ -399,7 +401,9 @@ def collect_responses(sub_id,
                       reaction_time,
                       opacity,
                       accuracy,
-                      responsebuttons):
+                      responsebuttons,
+                      fixamount,
+                      presentedfixations):
     
     trial_column = pandas.DataFrame({'sub_id' : [sub_id], 
                                  'age' : [age],
@@ -416,7 +420,9 @@ def collect_responses(sub_id,
                                  'reaction_time' : [reaction_time],
                                  'opacity' : [opacity],
                                  'accuracy' : [accuracy],
-                                 'responsebuttons' : [responsebuttons]})
+                                 'responsebuttons' : [responsebuttons],
+                                 'fixamount' : [fixamount],
+                                 'presentedfixations' : [presentedfixations]})
     return trial_column
 
 #######################################################
@@ -485,6 +491,7 @@ def start_experiment(win,
             
             typeofpath = gaze_path_temp[0]
             
+            
             sub_data = sub_data.append(collect_responses(sub_id=sub_id,
                                                          age=age,
                                                          sex=sex,
@@ -500,7 +507,9 @@ def start_experiment(win,
                                                          reaction_time=RT,
                                                          opacity = opacity,
                                                          accuracy= answer,
-                                                         responsebuttons = response_buttons))           
+                                                         responsebuttons = response_buttons,
+                                                         fixamount = (len(gaze_path_temp) - 1)),
+                                                         presentedfixations = gaze_path_temp)           
             
             try:
                 sub_data.to_csv(file_path, 
