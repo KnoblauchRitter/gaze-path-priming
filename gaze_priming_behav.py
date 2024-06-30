@@ -15,10 +15,14 @@ img_list = glob.glob(os.path.join(img_dir, "*.png"))
 instruction_img_ALLF = os.path.join(os.getcwd(), "instructions_image_ALLF.png")
 instruction_img_AFLL = os.path.join(os.getcwd(), "instructions_image_AFLL.png")
 
+sortorder =  [0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15]
+img_list_temp = [img_list[i] for i in sortorder]
+sorted_img_list = img_list_temp + img_list_temp
+
 # constants 
 BACKGROUND_COLOR = [128, 128, 128]
 RGB_GREY = [128, 128, 128]
-MAX_TRIALS = len(img_list)
+MAX_TRIALS = 32
 MAX_BLOCKS = 5
 trial_dur = 6000
 trial_keys = ["a", "f"]
@@ -75,7 +79,27 @@ response_buttons = supervisor_input.data[5]
 
 # Load in Gaze Path Data as List
 with open("gazepathdata.json", "rb") as file_path:
-    gaze_path_list = json.load(file_path)
+    gpdata = json.load(file_path)
+
+
+
+
+def counterbalance_paths(listing,prefix, gaze_path_list):
+    for j in range(1,9):
+        image_cur = prefix + str(j);
+        sublist = []
+        for i in listing:
+            if(i[2][0] == image_cur):
+                sublist.append(i)
+        sublist = random.sample(sublist, 2)
+        for x in sublist:
+            gaze_path_list.append(x)
+    return gaze_path_list
+
+
+
+
+
 
 def present_text(window_instance,
                  text="If you are read this, \n please inform the experimentor!",
@@ -210,8 +234,8 @@ def present_gaze(window_instance,
                 ):
     
     timer = core.Clock()
-    #remove first entry with path type for easier handling
-    gaze_path_input = gaze_path_input[1:-1]
+    #remove first 3 entries with path type/viewerid/imgNr for easier handling
+    gaze_path_input = gaze_path_input[1:-3]
     
     for gaze_coordinates in gaze_path_input:
         dotfixation_stim = visual.Circle(window_instance,
@@ -325,11 +349,29 @@ def present_trial_img(window_instance,
            opacity=0.08*actual
     
     if response_buttons == "AF_LL":
-        if keypress == ["a"] and "face" in img_input or keypress == ["f"] and "L" in img_input:
+        if keypress == ["a"] and "F" in img_input or keypress == ["f"] and "L" in img_input:
             reaction_time = (time.process_time() - start_time)
             draw_circle(win)
             return "correct", reaction_time, opacity, keypress
-        elif keypress == ["f"] and "face" in img_input or keypress == ["a"] and "L" in img_input:
+        elif keypress == ["f"] and "F" in img_input or keypress == ["a"] and "L" in img_input:
+            reaction_time = (time.process_time() - start_time)
+            draw_red_cross(win)    
+            return "incorrect", reaction_time, opacity, keypress
+        elif keypress == []: # return has switched from None to []
+            reaction_time = (time.process_time() - start_time)
+            present_text(
+                win,
+                text="You did not respond within time!",
+                continue_bool=False
+                )
+            return "incorrect", reaction_time, opacity, keypress
+        
+    if response_buttons == "AL_LF":
+        if keypress == ["f"] and "F" in img_input or keypress == ["a"] and "L" in img_input:
+            reaction_time = (time.process_time() - start_time)
+            draw_circle(win)
+            return "correct", reaction_time, opacity, keypress
+        elif keypress == ["a"] and "F" in img_input or keypress == ["f"] and "L" in img_input:
             reaction_time = (time.process_time() - start_time)
             draw_red_cross(win)    
             return "incorrect", reaction_time, opacity, keypress
@@ -366,7 +408,9 @@ def gen_file(sub_id_in):
                   "response_buttons": [],
                   "fix_num" : [],
                   "presented_img" : [], 
-                  "presented_fixations" : []
+                  "presented_fixations" : [],
+                  "sourceid" : [],
+                  "premature_keypress": []
         }
 
     return behav_data, output_f_path
@@ -381,8 +425,15 @@ def start_experiment(
         MAX_BLOCKS_IN, 
         MAX_TRIALS_IN):
     
-    sub_data, file_path = gen_file(sub_id_in) 
-
+    sub_data, file_path = gen_file(sub_id_in)
+    
+    #Block Counterbalance 
+    gaze_paths_faces = gaze_path_list_in[0:143]
+    gaze_paths_leafs = gaze_path_list_in[144:268]
+    #gaze_path_list = 32 Einträge je 2 von jedem Typ (F0x, L0x)
+    gaze_path_list = counterbalance_paths(gaze_paths_faces,'F0',[])
+    gaze_path_list = counterbalance_paths(gaze_paths_leafs,'L0',gaze_path_list)
+    
     if response_buttons_in == "AL_LF":
         instr_img = instruction_img_ALLF
     elif response_buttons_in == "AF_LL":
@@ -400,8 +451,14 @@ def start_experiment(
     global_timer = core.Clock()
 
     for block in range(MAX_BLOCKS_IN):
+        
+        #shuffle order of trials, while keeping the counterbalance structure
+        combined_list = list(zip(gaze_path_list, img_list_in))
+        random.shuffle(combined_list)
+        gaze_path_list, shuffled_img_list = zip(*combined_list)
+        
         if block == 0:
-            block_str = f"Block 1: \n To start the experiment press the left or right button!"
+            block_str = "Block 1: \n To start the experiment press the left or right button!"
         else:
             block_str = f"Block {block + 1}: Take a small break ... \n To continue press left or right button!"
         
@@ -410,9 +467,9 @@ def start_experiment(
                      continue_bool=True,
                      continue_keys=input_keys)
         
-        # TO-DO: check this!
-        shuffled_img_list = random.sample(img_list_in, len(img_list_in))
-        shuffled_gaze_path_list = random.sample(gaze_path_list_in, len(gaze_path_list_in))
+        
+        
+        
 
         for trial in range(MAX_TRIALS_IN):
             onset = global_timer.getTime()
@@ -424,16 +481,22 @@ def start_experiment(
             
             noise_sync = present_noise(window_instance, noise_list)
             
-            gaze_path_temp = shuffled_gaze_path_list[trial][0:random.randint(3,5)]
+            ###### obacht!!!!!
+            gaze_path_temp = gaze_path_list[trial][0:random.randint(5,7)]
 
             noise_sync = present_gaze(window_instance, 
                                       gaze_path_input=gaze_path_temp)
             
-            #  gaze_path_temp[-1][0] = last Fixation Position
+            # gaze_path_temp[-1][0] = last Fixation Position
             noise_sync, jitter = present_jitter(window_instance, 
                                                 fix_position=gaze_path_temp[-1][0],
                                                 noise_sync=noise_sync)
 
+            # get pressed keys bevore the actual task
+            premature_keypress = event.getKeys()
+            if premature_keypress == []:
+                premature_keypress = ["no early input"]
+            
             sub_response, reaction_time, opacity, button_pressed = present_trial_img(window_instance, 
                                                                                      shuffled_img_list[trial],
                                                                                      noise_sync,
@@ -441,7 +504,7 @@ def start_experiment(
                                                                                      trial_key_list_in=input_keys
                                                                                         )
             # section to make output more readable
-            if "F" == gaze_path_temp[0] and "face" in shuffled_img_list[trial] or "L" == gaze_path_temp[0] and "L" in shuffled_img_list[trial]:
+            if "F" == gaze_path_temp[0] and "F" in shuffled_img_list[trial] or "L" == gaze_path_temp[0] and "L" in shuffled_img_list[trial]:
                 congruency = "congruent"
             else:
                 congruency = "incongruent"
@@ -471,9 +534,11 @@ def start_experiment(
             sub_data["opacity"].append(opacity)
             sub_data["accuracy"].append(sub_response)
             sub_data["response_buttons"].append(response_buttons)
-            sub_data["fix_num"].append(len(gaze_path_temp) - 1)
+            sub_data["fix_num"].append(len(gaze_path_temp) - 3)
             sub_data["presented_img"].append(shuffled_img_list[trial].split("/")[-1])
             sub_data["presented_fixations"].append(gaze_path_temp)
+            sub_data["sourceid"].append(gaze_path_temp[1])
+            sub_data["premature_keypress"].append(premature_keypress)
             
             present_ITI(window_instance, duration=1)
 
@@ -486,9 +551,9 @@ def start_experiment(
 # start the actual experiment
 start_experiment(window_instance=win, 
                  sub_id_in=sub_id,
-                 img_list_in=img_list, 
+                 img_list_in=sorted_img_list, 
                  input_keys=trial_keys,
-                 gaze_path_list_in=gaze_path_list,
+                 gaze_path_list_in=gpdata,
                  response_buttons_in=response_buttons,
                  MAX_BLOCKS_IN=MAX_BLOCKS,
                  MAX_TRIALS_IN=MAX_TRIALS
