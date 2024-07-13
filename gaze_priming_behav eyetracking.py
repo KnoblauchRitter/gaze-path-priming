@@ -6,6 +6,8 @@ import pandas as pd
 import json
 from psychopy import gui, core, visual, event
 from psychopy_visionscience.noise import NoiseStim
+from psychopy.iohub.client import launchHubServer
+
 
 window_size = [1920, 1080]
 
@@ -46,7 +48,7 @@ for i in range(50):
         win=win, 
         name="noise", 
         units="pix",
-        size=(2028, 2028),
+        size=(2048, 2048),
         noiseType="Filtered",
         noiseFractalPower="-1",
         texRes=1024, 
@@ -82,7 +84,60 @@ with open("gazepathdata.json", "rb") as file_path:
     gpdata = json.load(file_path)
 
 
+#######################################################
+##########      EYETRACKER SETUP         ##############
+#######################################################
+TRACKER = 'eyelink'
+devices_config = dict()
+eyetracker_config = dict(name='tracker')
+if TRACKER == 'mouse':
+    eyetracker_config['calibration'] = dict(screen_background_color=BACKGROUND_COLOR)
+    devices_config['eyetracker.hw.mouse.EyeTracker'] = eyetracker_config
+elif TRACKER == 'eyelink':
+    eyetracker_config['model_name'] = 'EYELINK 1000 DESKTOP'
+    eyetracker_config['runtime_settings'] = dict(sampling_rate=1000, track_eyes='RIGHT')
+    eyetracker_config['calibration'] = dict(screen_background_color=BACKGROUND_COLOR)
+    devices_config['eyetracker.hw.sr_research.eyelink.EyeTracker'] = eyetracker_config
 
+CALIBRATION_SETTINGS = {
+                        'unit_type':'pix',
+                        'color_type':'rgb255',
+                        'target_attributes':dict(outer_diameter=42,
+                                                inner_diameter=11,
+                                                target_duration=1,
+                                                target_delay = 2
+                                                ),
+                        'screen_background_color':RGB_GREY
+                    }
+
+iohub_config = {'eyetracker.hw.sr_research.eyelink.EyeTracker':
+                    {
+                    'name':'tracker',
+                    'model_name':'EYELINK 1000 DESKTOP',
+                    'calibration':CALIBRATION_SETTINGS
+                    }
+                }
+
+io = launchHubServer(window=win, **iohub_config)
+io.clearEvents()
+tracker = io.getDevice('tracker')
+
+# run eyetracker calibration
+tracker.sendCommand('calibration_area_proportion = 0.65 0.65')
+tracker.sendCommand('validation_area_proportion = 0.65 0.65')
+result = tracker.runSetupProcedure()
+print("Calibration returned: ", result)
+
+# reinitialise the HubServer to get rid of the display trouble
+io.quit()
+io = launchHubServer(window=win, **iohub_config)
+tracker = io.getDevice('tracker')
+
+tracker.setRecordingState(True)
+
+#######################################################
+##########           Functions           ##############
+#######################################################
 
 def counterbalance_paths(listing,prefix, gaze_path_list):
     for j in range(1,9):
@@ -230,7 +285,9 @@ def present_gaze(window_instance,
     
     timer = core.Clock()
     #remove first 3 entries with path type/viewerid/imgNr for easier handling
+    print("gazepathinfunktion davor", gaze_path_input)
     gaze_path_input = gaze_path_input[3:]
+    print("gazepathinfunktion danach", gaze_path_input)
     for gaze_coordinates in gaze_path_input:
         dotfixation_stim = visual.Circle(window_instance,
                                         radius=10,
@@ -314,7 +371,7 @@ def present_trial_img(window_instance,
     
     while done == False:
         actual = timer.getTime()
-       
+        
         image_stim = visual.ImageStim(
             window_instance,
             image=img_input,
@@ -447,6 +504,8 @@ def start_experiment(
 
     for block in range(MAX_BLOCKS_IN):
         
+        tracker.sendMessage(f"EVT_START BLOCKnr {block}")
+
         #shuffle order of trials, while keeping the counterbalance structure
         combined_list = list(zip(gaze_path_list, img_list_in))
         random.shuffle(combined_list)
@@ -468,6 +527,8 @@ def start_experiment(
 
         for trial in range(MAX_TRIALS_IN):
             onset = global_timer.getTime()
+            tracker.setRecordingState(True)
+            tracker.sendMessage(f"EVT_START TRIALnr {trial}")
 
             draw_fixation(
                 window_instance, 
@@ -477,8 +538,10 @@ def start_experiment(
             noise_sync = present_noise(window_instance, noise_list)
             
             ###### obacht!!!!!
-            gaze_path_temp = gaze_path_list[trial][0:random.randint(5,7)]
+            gaze_path_temp = gaze_path_list[trial][0:random.randint(6,8)]
+            
 
+            print(gaze_path_temp)
             noise_sync = present_gaze(window_instance, 
                                       gaze_path_input=gaze_path_temp)
             
@@ -498,6 +561,12 @@ def start_experiment(
                                                                                      gaze_path_temp[-1][0],
                                                                                      trial_key_list_in=input_keys
                                                                                         )
+            
+            
+            tracker.setRecordingState(False)
+            tracker.sendMessage(f"EVT_END TRIALnr {trial}")
+
+            
             # section to make output more readable
             type_path = gaze_path_temp[0]
             if type_path == ["L"]:
@@ -552,6 +621,9 @@ def start_experiment(
             except:
                 raise Exception(f"Error saving file at: {file_path}")
 
+        tracker.sendMessage(f"EVT_END BLOCKnr {block}")
+
+
 # start the actual experiment
 start_experiment(window_instance=win, 
                  sub_id_in=sub_id,
@@ -562,6 +634,10 @@ start_experiment(window_instance=win,
                  MAX_BLOCKS_IN=MAX_BLOCKS,
                  MAX_TRIALS_IN=MAX_TRIALS
                  )
+
+tracker.setRecordingState(False)
+tracker.setConnectionState(False)
+io.quit()
 
 present_text(window_instance=win,
              text="Thank you for your participation in the experiment! \n The experimenter will contact you shortly.",
