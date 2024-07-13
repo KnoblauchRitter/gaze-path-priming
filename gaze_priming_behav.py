@@ -477,7 +477,7 @@ def start_experiment(
             noise_sync = present_noise(window_instance, noise_list)
             
             ###### obacht!!!!!
-            gaze_path_temp = gaze_path_list[trial][0:random.randint(5,7)]
+            gaze_path_temp = gaze_path_list[trial][0:random.randint(6,8)]
 
             noise_sync = present_gaze(window_instance, 
                                       gaze_path_input=gaze_path_temp)
